@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pipeline</title>
+<style>
+  :root{
+    --ink:#14171a;
+    --paper:#f6f5f1;
+    --panel:#ffffff;
+    --line:#dfddd6;
+    --accent:#2b6cb0;
+    --accent-soft:#eaf2fa;
+    --amber:#a3672c;
+    --red:#a3372c;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); line-height:1.5;
+    display:flex; justify-content:center;
+  }
+  main{width:100%; max-width:600px; padding:56px 24px 90px}
+
+  .mark{ font-family:var(--mono); font-size:0.72rem; letter-spacing:.02em; color:var(--accent); margin:0 0 6px }
+  h1{font-size:1.4rem; font-weight:600; margin:0 0 6px; letter-spacing:-.01em}
+  .sub{color:#767a72; font-size:0.92rem; margin:0 0 36px; max-width:46ch}
+
+  .dropzone{
+    border:1.5px solid var(--line); border-radius:10px;
+    padding:32px 20px; text-align:center; cursor:pointer;
+    background:var(--panel);
+    transition:border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone.drag{ border-color:var(--accent); background:var(--accent-soft); }
+  .dropzone input{ display:none; }
+  .dropzone .label{ font-size:0.92rem; color:#555 }
+  .dropzone .hint{ font-size:0.78rem; color:#9a9d95; margin-top:4px }
+  .dropzone .fname{ font-family:var(--mono); font-size:0.86rem; margin-top:10px; color:var(--ink); font-weight:500 }
+
+  button.go{
+    margin-top:14px; width:100%; padding:12px 16px;
+    background:var(--ink); color:var(--paper); border:none; border-radius:8px;
+    font-size:0.92rem; font-weight:500; cursor:pointer; letter-spacing:.01em;
+    transition:opacity .15s;
+  }
+  button.go:disabled{ background:#c7c5bc; cursor:not-allowed }
+  button.go:not(:disabled):hover{ opacity:.88 }
+
+  .track{ margin-top:44px; display:none }
+  .track.show{ display:block }
+
+  .pipeline{ display:flex; align-items:center; margin-bottom:22px }
+  .stage{ flex:1; text-align:center; position:relative }
+  .stage .dot{
+    width:9px; height:9px; border-radius:50%; background:var(--line);
+    margin:0 auto 8px; transition:background .3s, transform .3s;
+  }
+  .stage.on .dot{ background:var(--accent); transform:scale(1.3) }
+  .stage.fail .dot{ background:var(--red) }
+  .stage .lbl{ font-size:0.72rem; color:#9a9d95; font-family:var(--mono) }
+  .stage.on .lbl{ color:var(--ink) }
+  .connector{ flex:1; height:1px; background:var(--line); margin-bottom:20px; transition:background .3s }
+  .connector.on{ background:var(--accent) }
+
+  .statusrow{ display:flex; align-items:baseline; justify-content:space-between; padding-bottom:14px; border-bottom:1px solid var(--line); margin-bottom:18px }
+  .statusrow .fname{ font-size:0.88rem; font-weight:500 }
+  .statusrow .state{ font-family:var(--mono); font-size:0.78rem; padding:3px 9px; border-radius:20px }
+  .state.queued{ color:#767a72; background:#eeece5 }
+  .state.processing{ color:var(--amber); background:#f5ead9 }
+  .state.success{ color:var(--accent); background:var(--accent-soft) }
+  .state.failed{ color:var(--red); background:#f6e2de }
+
+  .errbox{
+    padding:12px 14px; border:1px solid var(--red); border-radius:8px;
+    font-family:var(--mono); font-size:0.8rem; color:var(--red); background:#fbf1ef;
+  }
+
+  .results h2{ font-size:0.74rem; text-transform:uppercase; letter-spacing:.05em; color:#9a9d95; font-weight:600; margin:0 0 14px }
+
+  .imgs{ display:flex; gap:10px; flex-wrap:wrap }
+  .imgs figure{ margin:0; flex:1; min-width:140px }
+  .imgs img{ width:100%; display:block; border-radius:8px; border:1px solid var(--line) }
+  .imgs figcaption{ font-family:var(--mono); font-size:0.72rem; color:#9a9d95; margin-top:5px }
+
+  .textbox{
+    border:1px solid var(--line); border-radius:8px; padding:14px 16px;
+    font-family:var(--mono); font-size:0.82rem; white-space:pre-wrap;
+    max-height:220px; overflow:auto; background:var(--panel);
+  }
+
+  table.freq{ width:100%; border-collapse:collapse; font-size:0.87rem }
+  table.freq td{ padding:7px 0; border-bottom:1px solid var(--line) }
+  table.freq td:first-child{ font-family:var(--mono) }
+  table.freq td:last-child{ text-align:right; color:#9a9d95; font-family:var(--mono) }
+</style>
+</head>
+<body>
+<main>
+  <p class="mark">file-pipeline</p>
+  <h1>Drop a file, walk away</h1>
+  <p class="sub">Images, PDFs, and text files get resized, parsed, or counted in the background — check back once it's done.</p>
+
+  <label class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*,application/pdf,text/plain">
+    <div class="label" id="dzLabel">Click to choose a file, or drag one here</div>
+    <div class="hint">Images · PDFs · plain text — up to 10MB</div>
+    <div class="fname" id="dzFname"></div>
+  </label>
+  <button class="go" id="goBtn" disabled>Upload</button>
+
+  <div class="track" id="track">
+    <div class="pipeline">
+      <div class="stage" id="stgQueued"><div class="dot"></div><div class="lbl">queued</div></div>
+      <div class="connector" id="c0"></div>
+      <div class="stage" id="stgProcessing"><div class="dot"></div><div class="lbl">processing</div></div>
+      <div class="connector" id="c1"></div>
+      <div class="stage" id="stgDone"><div class="dot"></div><div class="lbl">done</div></div>
+    </div>
+
+    <div class="statusrow">
+      <span class="fname" id="trackFname"></span>
+      <span class="state queued" id="stateText">queued</span>
+    </div>
+
+    <div class="errbox" id="errBox" style="display:none"></div>
+
+    <div class="results" id="results" style="display:none">
+      <h2 id="resultsLabel">Result</h2>
+      <div id="resultsBody"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const dz = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const dzFname = document.getElementById('dzFname');
+const goBtn = document.getElementById('goBtn');
+const track = document.getElementById('track');
+const stateText = document.getElementById('stateText');
+const trackFname = document.getElementById('trackFname');
+const errBox = document.getElementById('errBox');
+const results = document.getElementById('results');
+const resultsLabel = document.getElementById('resultsLabel');
+const resultsBody = document.getElementById('resultsBody');
+
+const stages = {
+  queued: document.getElementById('stgQueued'),
+  processing: document.getElementById('stgProcessing'),
+  done: document.getElementById('stgDone')
+};
+const connectors = [document.getElementById('c0'), document.getElementById('c1')];
+
+let pollTimer = null;
+
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files[0];
+  dzFname.textContent = f ? f.name : '';
+  goBtn.disabled = !f;
+});
+
+['dragover', 'dragleave', 'drop'].forEach(evt => {
+  dz.addEventListener(evt, e => {
+    e.preventDefault();
+    dz.classList.toggle('drag', evt === 'dragover');
+    if (evt === 'drop' && e.dataTransfer.files[0]) {
+      fileInput.files = e.dataTransfer.files;
+      fileInput.dispatchEvent(new Event('change'));
+    }
+  });
+});
+
+goBtn.addEventListener('click', async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  goBtn.disabled = true;
+  goBtn.textContent = 'Uploading…';
+  resetTrack(file.name);
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Upload failed');
+
+    track.classList.add('show');
+    setStage('queued');
+    poll(data.mongoId);
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    goBtn.disabled = false;
+    goBtn.textContent = 'Upload';
+  }
+});
+
+function resetTrack(fname) {
+  clearInterval(pollTimer);
+  Object.values(stages).forEach(s => s.classList.remove('on', 'fail'));
+  connectors.forEach(c => c.classList.remove('on'));
+  errBox.style.display = 'none';
+  results.style.display = 'none';
+  resultsBody.innerHTML = '';
+  trackFname.textContent = fname;
+  setState('queued');
+}
+
+function setState(s) {
+  stateText.textContent = s;
+  stateText.className = 'state ' + s;
+}
+
+function setStage(name) {
+  const order = ['queued', 'processing', 'done'];
+  const idx = order.indexOf(name);
+  order.forEach((key, i) => {
+    if (i <= idx) stages[key].classList.add('on');
+  });
+  connectors.forEach((c, i) => { if (i < idx) c.classList.add('on'); });
+}
+
+function showError(msg) {
+  setState('failed');
+  Object.values(stages).forEach(s => s.classList.add('fail'));
+  errBox.style.display = 'block';
+  errBox.textContent = msg;
+}
+
+function poll(id) {
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`/jobs/${id}`);
+      const job = await res.json();
+
+      setState(job.status);
+      if (job.status === 'processing') setStage('processing');
+
+      if (job.status === 'success') {
+        clearInterval(pollTimer);
+        setStage('done');
+        renderResults(job);
+      }
+      if (job.status === 'failed') {
+        clearInterval(pollTimer);
+        showError(job.error_message || 'Processing failed');
+      }
+    } catch (err) {
+      clearInterval(pollTimer);
+      showError('Lost connection while polling: ' + err.message);
+    }
+  }, 1500);
+}
+
+async function renderResults(job) {
+  results.style.display = 'block';
+
+  if (job.result && job.result.length && job.filetype && job.filetype.startsWith('image/')) {
+    resultsLabel.textContent = 'Resized images';
+    const wrap = document.createElement('div');
+    wrap.className = 'imgs';
+    job.result.forEach(r => {
+      const fig = document.createElement('figure');
+      fig.innerHTML = `<img src="${r.url}"><figcaption>${r.label}</figcaption>`;
+      wrap.appendChild(fig);
+    });
+    resultsBody.innerHTML = '';
+    resultsBody.appendChild(wrap);
+    return;
+  }
+
+  if (job.result && job.result.length && job.filetype === 'application/pdf') {
+    resultsLabel.textContent = 'Extracted text';
+    const box = document.createElement('div');
+    box.className = 'textbox';
+    box.textContent = 'Loading…';
+    resultsBody.innerHTML = '';
+    resultsBody.appendChild(box);
+    try {
+      const txt = await (await fetch(job.result[0].url)).text();
+      box.textContent = txt;
+    } catch {
+      box.textContent = 'Could not load extracted text — open the link directly:\n' + job.result[0].url;
+    }
+    return;
+  }
+
+  if (job.word_frequency && Object.keys(job.word_frequency).length) {
+    resultsLabel.textContent = 'Top words';
+    const entries = Object.entries(job.word_frequency).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const table = document.createElement('table');
+    table.className = 'freq';
+    table.innerHTML = entries.map(([w, c]) => `<tr><td>${w}</td><td>${c}</td></tr>`).join('');
+    resultsBody.innerHTML = '';
+    resultsBody.appendChild(table);
+    return;
+  }
+
+  resultsLabel.textContent = 'Result';
+  resultsBody.textContent = 'No output produced.';
+}
+</script>
+</body>
+</html>

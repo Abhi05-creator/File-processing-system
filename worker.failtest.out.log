@@ -1,0 +1,24 @@
+◇ injected env (7) from test\config.env // tip: ⌘ enable debugging { debug: true }
+Worker connected to MongoDB
+Full job doc: {
+  _id: new ObjectId('6a99245efe342b42d964e2cc'),
+  filetype: 'image/jpeg',
+  filename: 'output-small.jpg',
+  file_url: 'https://mfymacjmudeouydjixmr.supabase.co/storage/v1/object/public/uploads/1788421213759output-small.jpg',
+  status: 'queued',
+  created_at: 2026-09-03T07:40:14.698Z,
+  result: [],
+  __v: 0
+}
+{
+  _id: new ObjectId('6a99245efe342b42d964e2cc'),
+  filetype: 'image/jpeg',
+  filename: 'output-small.jpg',
+  file_url: 'https://mfymacjmudeouydjixmr.supabase.co/storage/v1/object/public/uploads/1788421213759output-small.jpg',
+  status: 'queued',
+  created_at: 2026-09-03T07:40:14.698Z,
+  result: [],
+  __v: 0
+}
+buffer-len: 374
+job completed 6a99245efe342b42d964e2cc

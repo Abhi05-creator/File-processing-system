@@ -1,0 +1,4 @@
+◇ injected env (7) from test\config.env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from test\config.env // tip: ◈ secrets for agents [www.dotenvx.com]
+Server started on port 3000
+MongoDB connected

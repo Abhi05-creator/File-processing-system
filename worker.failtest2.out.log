@@ -1,0 +1,24 @@
+◇ injected env (7) from test\config.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Worker connected to MongoDB
+Full job doc: {
+  _id: new ObjectId('6a9924bdfe342b42d964e2cd'),
+  filetype: 'image/jpeg',
+  filename: 'output-small.jpg',
+  file_url: 'https://mfymacjmudeouydjixmr.supabase.co/storage/v1/object/public/uploads/1788421308373output-small.jpg',
+  status: 'queued',
+  created_at: 2026-09-03T07:41:49.552Z,
+  result: [],
+  __v: 0
+}
+{
+  _id: new ObjectId('6a9924bdfe342b42d964e2cd'),
+  filetype: 'image/jpeg',
+  filename: 'output-small.jpg',
+  file_url: 'https://mfymacjmudeouydjixmr.supabase.co/storage/v1/object/public/uploads/1788421308373output-small.jpg',
+  status: 'queued',
+  created_at: 2026-09-03T07:41:49.552Z,
+  result: [],
+  __v: 0
+}
+buffer-len: 374
+job completed 6a9924bdfe342b42d964e2cd
