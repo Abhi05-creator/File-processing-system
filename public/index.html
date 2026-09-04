@@ -267,8 +267,11 @@
     .imgs figcaption {
       font-family: var(--mono);
       font-size: 0.72rem;
-      color: #9a9d95;
-      margin-top: 5px
+      color: #767a72;
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .textbox {
@@ -485,7 +488,19 @@
         wrap.className = 'imgs';
         job.result.forEach(r => {
           const fig = document.createElement('figure');
-          fig.innerHTML = `<img src="${r.url}"><figcaption>${r.label}</figcaption>`;
+          fig.innerHTML = `
+            <a href="${r.url}" target="_blank" title="Click to open image in full resolution">
+              <img src="${r.url}">
+            </a>
+            <figcaption>
+              <span><strong style="text-transform:capitalize;">${r.label}</strong> <span class="img-dim" style="color:#767a72;margin-left:2px;">(loading…)</span></span>
+              <a href="${r.url}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500;">open ↗</a>
+            </figcaption>`;
+          const imgEl = fig.querySelector('img');
+          const dimEl = fig.querySelector('.img-dim');
+          imgEl.onload = () => {
+            dimEl.textContent = `(${imgEl.naturalWidth}×${imgEl.naturalHeight}px)`;
+          };
           wrap.appendChild(fig);
         });
         resultsBody.innerHTML = '';

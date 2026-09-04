@@ -6,7 +6,12 @@ const path = require('path');
 const jobRoutes = require('./routes/jobroutes');
 
 const uploadroutes = require('./routes/uploadroute')
-mongoose.connect('mongodb://localhost:27017/file-pipeline')
+const dns = require('dns');
+if (process.env.MONGO_URI && process.env.MONGO_URI.startsWith('mongodb+srv')) {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+}
+
+mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB connected'))
     .catch((err) => console.error('MongoDB connection error:', err));
 

@@ -7,7 +7,10 @@ const jobs = require('./models/jobmodel');
 const sharp = require('sharp');
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const pdfParse = require('pdf-parse');
+const dns = require('dns');
+if (process.env.MONGO_URI && process.env.MONGO_URI.startsWith('mongodb+srv')) {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+}
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('Worker connected to MongoDB'))
@@ -18,6 +21,22 @@ const connection = {
     port: parseInt(process.env.REDIS_PORT),
     username: process.env.REDIS_USERNAME,
     password: process.env.REDIS_PASSWORD,
+}
+
+async function extractTextFromPdf(buffer) {
+    const pdfModule = require('pdf-parse');
+    if (typeof pdfModule === 'function') {
+        const data = await pdfModule(buffer);
+        return data.text;
+    } else if (pdfModule.PDFParse) {
+        const parser = new pdfModule.PDFParse({ data: buffer });
+        const data = await parser.getText();
+        if (typeof parser.destroy === 'function') {
+            await parser.destroy();
+        }
+        return data.text;
+    }
+    throw new Error('Unsupported pdf-parse version');
 }
 
 const worker = new Worker('file-processing', async (job) => {
@@ -91,10 +110,7 @@ const worker = new Worker('file-processing', async (job) => {
             await jobs.findByIdAndUpdate(mongoId, { result: results }, { runValidators: true });
         }
         if (filetype === 'application/pdf') {
-            const pdfParse = require('pdf-parse');
-
-            const data = await pdfParse(buffer);
-            const extractedText = data.text;
+            const extractedText = await extractTextFromPdf(buffer);
 
 
             const outputFilename = `${Date.now()}-extracted-${jobdoc.filename}.txt`;
@@ -139,7 +155,7 @@ worker.on('completed', (job) => {
 worker.on('failed', async (job, err) => {
     const { mongoId } = job.data;
     console.log(`job failed ${mongoId}','${err.message}`)
-    if (job.attemptsMade > 3) {
+    if (job.attemptsMade >= (job.opts?.attempts || 1)) {
         await jobs.findByIdAndUpdate(
             mongoId,
             { status: 'failed', error_message: err.message },
