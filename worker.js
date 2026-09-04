@@ -9,7 +9,7 @@ const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const pdfParse = require('pdf-parse');
 
-mongoose.connect('mongodb://localhost:27017/file-pipeline')
+mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('Worker connected to MongoDB'))
     .catch((err) => console.error('MongoDB connection error:', err));
 
@@ -37,14 +37,22 @@ const worker = new Worker('file-processing', async (job) => {
         const buffer = Buffer.from(arrayBuffer);
         console.log("buffer-len:", buffer.length);
         if (filetype === 'text/plain') {
+            const stopWords = new Set([
+                'the', 'a', 'an', 'is', 'are', 'was', 'were', 'and', 'or', 'of',
+                'to', 'in', 'on', 'for', 'with', 'this', 'that', 'it', 'as', 'be',
+                'at', 'by', 'from', 'but', 'not', 'has', 'have', 'had', 'i', 'you'
+            ]);
             const text = buffer.toString('utf-8');
             const words = text.split(/\s+/)
             const freq = {};
             for (const word of words) {
-                if (freq[word]) {
-                    freq[word] += 1;
-                } else {
-                    freq[word] = 1;
+                const cleanWord = word.toLowerCase().trim();
+                if (cleanWord !== "" && !stopWords.has(cleanWord)) {
+                    if (freq[cleanWord]) {
+                        freq[cleanWord] += 1;
+                    } else {
+                        freq[cleanWord] = 1;
+                    }
                 }
             }
 
@@ -118,11 +126,7 @@ const worker = new Worker('file-processing', async (job) => {
         await jobs.findByIdAndUpdate(mongoId, { status: 'success' }, { runValidators: true })
     } catch (err) {
         console.error(`Job ${mongoId} failed:`, err.message);
-        await jobs.findByIdAndUpdate(
-            mongoId,
-            { status: 'failed', error_message: err.message },
-            { runValidators: true }
-        );
+        throw err;
     }
 
 
@@ -132,7 +136,26 @@ worker.on('completed', (job) => {
     console.log(`job completed ${job.data.mongoId}`)
 })
 
-worker.on('failed', (job, err) => {
-    console.log(`job failed ${job.data.mongoId}','${err.message}`)
-
+worker.on('failed', async (job, err) => {
+    const { mongoId } = job.data;
+    console.log(`job failed ${mongoId}','${err.message}`)
+    if (job.attemptsMade > 3) {
+        await jobs.findByIdAndUpdate(
+            mongoId,
+            { status: 'failed', error_message: err.message },
+            { runValidators: true }
+        );
+        console.log(`Job ${mongoId} permanently failed after ${job.attemptsMade} attempts`);
+    }
 })
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => {
+    res.status(200).send('Worker is running');
+});
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+    console.log(`Worker health-check server listening on port ${PORT}`);
+});
